@@ -11,6 +11,21 @@ function getPool() {
   if (!pool) {
     let connectionString = process.env.DATABASE_URL || 'postgresql://postgres:90uk7RbNgwcBPWwl@db.vfybcfhcfwefugiynmhg.supabase.co:5432/postgres';
     
+    // Automatically convert direct Supabase host (IPv6 only) to Supabase IPv4 Pooler host if direct host is passed
+    if (connectionString.includes('.supabase.co:5432') && !connectionString.includes('pooler.supabase.com')) {
+      console.log('[DB Config] Direct Supabase host detected. Converting to Supabase IPv4 Pooler endpoint for Render compatibility...');
+      // Extract project ref (e.g. vfybcfhcfwefugiynmhg)
+      const match = connectionString.match(/db\.([a-z0-9]+)\.supabase\.co/);
+      if (match && match[1]) {
+        const projectRef = match[1];
+        // Replace db.ref.supabase.co:5432 with pooler host and format username as postgres.ref
+        connectionString = connectionString
+          .replace('postgresql://postgres:', `postgresql://postgres.${projectRef}:`)
+          .replace(`db.${projectRef}.supabase.co:5432`, `aws-0-us-east-1.pooler.supabase.com:6543`);
+        console.log('[DB Config] Converted Connection String Host: aws-0-us-east-1.pooler.supabase.com:6543');
+      }
+    }
+
     pool = new Pool({
       connectionString,
       ssl: connectionString.includes('localhost') ? false : { rejectUnauthorized: false }
