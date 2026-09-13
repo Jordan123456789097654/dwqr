@@ -1,0 +1,30 @@
+{
+  "name": "roblox-license-bot",
+  "version": "1.0.0",
+  "description": "Discord Bot and Express API for Roblox Product License and Whitelist Management powered by Supabase PostgreSQL",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node src/index.js",
+    "check": "node --check src/index.js && node --check src/db/database.js && node --check src/api/server.js && node --check src/bot/client.js && node --check src/bot/commands.js",
+    "test": "node test/test-system.js"
+  },
+  "keywords": [
+    "roblox",
+    "discord-bot",
+    "license-manager",
+    "whitelist",
+    "express",
+    "postgresql",
+    "supabase"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "discord.js": "^14.16.3",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "pg": "^8.13.0"
+  }
+}
