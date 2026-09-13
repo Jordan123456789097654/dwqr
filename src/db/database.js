@@ -1,10 +1,15 @@
+const dns = require('dns');
+if (dns.setDefaultResultOrder) {
+  dns.setDefaultResultOrder('ipv4first');
+}
+
 const { Pool } = require('pg');
 
 let pool = null;
 
 function getPool() {
   if (!pool) {
-    const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:90uk7RbNgwcBPWwl@db.vfybcfhcfwefugiynmhg.supabase.co:5432/postgres';
+    let connectionString = process.env.DATABASE_URL || 'postgresql://postgres:90uk7RbNgwcBPWwl@db.vfybcfhcfwefugiynmhg.supabase.co:5432/postgres';
     
     pool = new Pool({
       connectionString,
@@ -12,7 +17,7 @@ function getPool() {
     });
 
     pool.on('error', (err) => {
-      console.error('[DB Error] Unexpected error on idle PostgreSQL client:', err);
+      console.error('[DB Error] Unexpected error on idle PostgreSQL client:', err.message);
     });
   }
   return pool;
@@ -36,7 +41,6 @@ async function initDatabase() {
     );
   `);
 
-  // Ensure columns exist on products
   await db.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS description TEXT DEFAULT 'Axis Core Retail Product';`);
   await db.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS price_robux INTEGER DEFAULT 0;`);
   await db.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS place_id_lock VARCHAR(100);`);
@@ -169,7 +173,6 @@ const dbService = {
   async grantWhitelist({ productId, robloxUserId = null, discordUserId = null, grantedBy = 'system', expiresAt = null }) {
     const db = getPool();
 
-    // Check if target is blacklisted
     if (robloxUserId && await this.isBlacklisted(robloxUserId)) {
       throw new Error(`Target Roblox ID ${robloxUserId} is globally blacklisted.`);
     }
@@ -177,7 +180,6 @@ const dbService = {
       throw new Error(`Target Discord User ${discordUserId} is globally blacklisted.`);
     }
 
-    // Resolve bindings
     if (discordUserId && !robloxUserId) {
       const binding = await this.getBindingByDiscord(discordUserId);
       if (binding) robloxUserId = binding.roblox_user_id;
@@ -187,7 +189,6 @@ const dbService = {
       if (binding) discordUserId = binding.discord_user_id;
     }
 
-    // Check existing active whitelist
     let existingRes;
     if (robloxUserId) {
       existingRes = await db.query(`SELECT * FROM whitelists WHERE product_id = $1 AND roblox_user_id = $2 AND is_active = TRUE`, [productId, String(robloxUserId)]);
@@ -226,11 +227,9 @@ const dbService = {
   async checkWhitelist(productId, robloxUserId = null, discordUserId = null, placeId = null) {
     const db = getPool();
 
-    // Check global blacklist
     if (robloxUserId && await this.isBlacklisted(robloxUserId)) return { isWhitelisted: false, reason: 'User is globally blacklisted.' };
     if (discordUserId && await this.isBlacklisted(discordUserId)) return { isWhitelisted: false, reason: 'User is globally blacklisted.' };
 
-    // Check Place Lock if placeId provided
     if (placeId) {
       const product = await this.getProduct(productId);
       if (product && product.place_id_lock && product.place_id_lock !== String(placeId)) {
@@ -238,7 +237,6 @@ const dbService = {
       }
     }
 
-    // Direct check
     let sql = `SELECT * FROM whitelists WHERE product_id = $1 AND is_active = TRUE AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP) AND (`;
     const params = [productId];
     const clauses = [];
@@ -256,7 +254,6 @@ const dbService = {
     const directRes = await db.query(sql, params);
     if (directRes.rows.length > 0) return { isWhitelisted: true, whitelist: directRes.rows[0] };
 
-    // Check via bindings
     if (discordUserId && !robloxUserId) {
       const binding = await this.getBindingByDiscord(discordUserId);
       if (binding) {
@@ -318,7 +315,6 @@ const dbService = {
       [String(targetId), reason, staffId]
     );
 
-    // Deactivate all active whitelists for this target
     await db.query(`UPDATE whitelists SET is_active = FALSE WHERE roblox_user_id = $1 OR discord_user_id = $1`, [String(targetId)]);
 
     return res.rows[0];

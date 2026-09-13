@@ -1,3 +1,8 @@
+const dns = require('dns');
+if (dns.setDefaultResultOrder) {
+  dns.setDefaultResultOrder('ipv4first');
+}
+
 require('dotenv').config();
 
 const db = require('./db/database');
@@ -9,7 +14,7 @@ async function main() {
   console.log('🚀 Starting Roblox License & Product Management System');
   console.log('--------------------------------------------------');
 
-  // 1. Initialize SQLite Database
+  // 1. Initialize Supabase PostgreSQL Database
   await db.initDatabase();
 
   // 2. Start Express API Server
@@ -18,6 +23,7 @@ async function main() {
   
   app.listen(PORT, () => {
     console.log(`[Express API] Server running on http://localhost:${PORT}`);
+    console.log(`[Express API] Admin Web Panel:              http://localhost:${PORT}/admin`);
     console.log(`[Express API] Roblox Verification Endpoint: POST http://localhost:${PORT}/api/v1/roblox/verify`);
     console.log(`[Express API] Roblox Purchase Endpoint:     POST http://localhost:${PORT}/api/v1/roblox/purchase`);
   });
@@ -30,8 +36,7 @@ async function main() {
   if (token && token !== 'your_discord_bot_token_here') {
     await startBot(token, clientId, guildId);
   } else {
-    console.warn('[Notice] DISCORD_TOKEN is missing or set to default in .env file.');
-    console.warn('[Notice] The Express API server is active for Roblox integration. Set up DISCORD_TOKEN to launch the Discord Bot.');
+    console.warn('[Notice] DISCORD_TOKEN is missing or default. Express API & Web Panel are running.');
   }
 }
 
