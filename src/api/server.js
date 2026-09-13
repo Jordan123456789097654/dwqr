@@ -16,6 +16,11 @@ function createApiServer() {
     res.sendFile(path.join(__dirname, '../web/public/index.html'));
   });
 
+  // Root URL Redirect to Admin Web Panel
+  app.get('/', (req, res) => {
+    res.redirect('/admin');
+  });
+
   // Authorization Middleware
   const authMiddleware = (req, res, next) => {
     const apiSecret = process.env.ROBLOX_API_SECRET;
@@ -32,7 +37,49 @@ function createApiServer() {
 
   // Health check
   app.get('/api/v1/health', (req, res) => {
-    res.json({ status: 'ok', service: 'Axis Core Retail Asset Whitelist API', timestamp: new Date().toISOString() });
+    res.json({ status: 'ok', service: 'Axis Core Retail Whitelist API & Web Panel', timestamp: new Date().toISOString() });
+  });
+
+  // Web Admin Panel Analytics & Stats Data Endpoint
+  app.get('/api/v1/admin/stats', async (req, res) => {
+    try {
+      const analytics = await db.getAnalytics();
+      const products = await db.getAllProducts();
+      const pool = db.getPool();
+      const wlRes = await pool.query(`SELECT * FROM whitelists ORDER BY created_at DESC LIMIT 50`);
+
+      return res.json({
+        success: true,
+        analytics,
+        products,
+        whitelists: wlRes.rows
+      });
+    } catch (err) {
+      console.error('[API Admin Stats Error]:', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Admin Grant Whitelist Endpoint (Web Panel)
+  app.post('/api/v1/admin/whitelists/grant', async (req, res) => {
+    try {
+      const { productId, robloxUserId, discordUserId } = req.body;
+      if (!productId || (!robloxUserId && !discordUserId)) {
+        return res.status(400).json({ success: false, error: 'Missing productId and target user ID' });
+      }
+
+      const wl = await db.grantWhitelist({
+        productId,
+        robloxUserId: robloxUserId || null,
+        discordUserId: discordUserId || null,
+        grantedBy: 'WebAdminPanel'
+      });
+
+      return res.json({ success: true, whitelist: wl });
+    } catch (err) {
+      console.error('[API Admin Grant Error]:', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
   });
 
   // Asset Whitelist Verification (Supports Place Creator / Group Owner checks)
@@ -44,7 +91,6 @@ function createApiServer() {
         return res.status(400).json({ success: false, error: 'Missing creatorId and productId' });
       }
 
-      // Check if creatorId (Roblox User or Group ID) has an active whitelist
       const result = await db.checkWhitelist(productId, creatorId, null, placeId);
       const product = await db.getProduct(productId);
 
